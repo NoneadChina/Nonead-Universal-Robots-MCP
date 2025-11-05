@@ -172,6 +172,7 @@ nUR_MCP_SERVER是基于MCP（Model Control Protocol）接口协议构建的智�
 
 注：所有工具均需先建立机器人连接后才能使用。
 
+
 ## 3. 免责申明
 
 请在使用 nUR MCP Server 前，确保操作人员已接受 UR 机器人安全培训，并熟悉紧急停止（E-stop）等安全操作。
@@ -261,7 +262,7 @@ nUR_MCP_SERVER是基于MCP（Model Control Protocol）接口协议构建的智�
 5. 安装 MCP Server:
 ```
      git clone https://gitee.com/nonead/Nonead-Universal-Robots-MCP.git
-     cd nUR_MCP_SERVER
+     cd Nonead-Universal-Robots-MCP
      pip install -r requirements.txt
 ```
 
@@ -274,7 +275,10 @@ MacOS: ~/Library/Application Support/Claude/claude_desktop_config.json
       "mcpServers": {
         "nUR_MCP_SERVER": {
           "command": "uvx",
-          "args": ["/home/nonead/MCP_Server/Nonead-Universal-Robots-MCP"]
+          "args": [
+            "https://www.nonead.com/download/nonead_universal_robots_mcp-0.1.0-py3-none-any.whl",
+            "nonead-universal-robots-mcp"
+          ]
         }
       }
     }
@@ -285,7 +289,10 @@ Windows: %APPDATA%/Claude/claude_desktop_config.json
       "mcpServers": {
         "nUR_MCP_SERVER": {
           "command": "uvx",
-          "args": ["D:\\MyProgram\\MCP_SERVER\\Nonead-Universal-Robots-MCP"]
+          "args": [
+            "https://www.nonead.com/download/nonead_universal_robots_mcp-0.1.0-py3-none-any.whl",
+            "nonead-universal-robots-mcp"
+          ]
         }
       }
     }
@@ -293,53 +300,62 @@ Windows: %APPDATA%/Claude/claude_desktop_config.json
 **要与 Cherry Studio 配合使用，请添加服务器配置：**  
 MacOS & Linux:  
 
-    {
-     "mcpServers": {
-       "nUR_MCP_SERVER": {
-       "name": "nUR_MCP_Server",
-       "type": "stdio",
-       "description": "NONEAD Universal-Robots MCP Server",
-       "isActive": true,
-       "provider": "NONEAD Corporation",
-       "providerUrl": "https://www.nonead.com",
-       "logoUrl": "https://www.nonead.com/assets/img/vi/5.png",
-       "tags": [
-         "NONEAD",
-         "nUR_MCP_Server",
-         "Universal-Robots"
-       ],
-       "command": "uvx",
-       "args": [
-         "/home/nonead/MCP_Server/Nonead-Universal-Robots-MCP"
-       ]
-      }
-     }
+
+```
+{
+  "mcpServers": {
+    "Nonead-Universal-Robots-MCP": {
+      "name": "Nonead-Universal-Robots-MCP",
+      "type": "stdio",
+      "description": "Nonead-Universal-Robots-MCP是基于MCP（Model Control Protocol）接口协议构建的智能工业协作机器人控制中间件系统，通过集成大语言模型（LLM）实现工业机器人的自然语言交互式控制。该产品采用Client-Server架构设计，支持与优傲（Universal Robots）全系列协作机器人深度集成，革新了传统示教器编程的工业机器人。",
+      "isActive": true,
+      "registryUrl": "https://pypi.tuna.tsinghua.edu.cn/simple",
+      "timeout": "600",
+      "provider": "拓德科技",
+      "providerUrl": "https://www.nonead.com",
+      "logoUrl": "https://www.nonead.com/assets/img/vi/5.png",
+      "tags": [
+        "优傲机器人大语言模型控制系统"
+      ],
+      "command": "uvx",
+      "args": [
+        "https://www.nonead.com/download/nonead_universal_robots_mcp-0.1.0-py3-none-any.whl",
+        "nonead-universal-robots-mcp"
+      ],
+      "installSource": "unknown"
     }
+  }
+}
+
+```
 
  Windows:
 
-    {
-     "mcpServers": {
-       "nUR_MCP_SERVER": {
-       "name": "nUR_MCP_Server",
-       "type": "stdio",
-       "description": "NONEAD Universal-Robots MCP Server",
-       "isActive": true,
-       "provider": "NONEAD Corporation",
-       "providerUrl": "https://www.nonead.com",
-       "logoUrl": "https://www.nonead.com/assets/img/vi/5.png",
-       "tags": [
-         "NONEAD",
-         "nUR_MCP_Server",
-         "Universal-Robots"
-       ],
-       "command": "uvx",
-       "args": [
-         "D:\\MyProgram\\MCP_SERVER\\Nonead-Universal-Robots-MCP" 
-         ]
-        }
-      }
+
+```
+   {
+  "mcpServers": {
+    "n5JzpK_3v_bgPnNNxry2o": {
+      "name": "NONEAD Universal-Robots MCP Server",
+      "type": "stdio",
+      "description": "Nonead-Universal-Robots-MCP是基于MCP（Model Control Protocol）接口协议构建的智能工业协作机器人控制中间件系统，通过集成大语言模型（LLM）实现工业机器人的自然语言交互式控制。该产品采用Client-Server架构设计，支持与优傲（Universal Robots）全系列协作机器人深度集成，革新了传统示教器编程的工业机器人。",
+      "isActive": true,
+      "registryUrl": "https://pypi.tuna.tsinghua.edu.cn/simple",
+      "provider": "拓德科技",
+      "providerUrl": "https://www.nonead.com",
+      "logoUrl": "https://www.nonead.com/assets/img/vi/5.png",
+      "tags": [],
+      "command": "uvx",
+      "args": [
+        "https://www.nonead.com/download/nonead_universal_robots_mcp-0.1.0-py3-none-any.whl",
+        "nonead-universal-robots-mcp"
+      ],
+      "installSource": "unknown"
     }
+  }
+}
+```
+
 
 **要与 Cline 配合使用，请添加服务器配置：**  
 MacOS & Linux:  
@@ -348,7 +364,10 @@ MacOS & Linux:
       "mcpServers": {
         "nUR_MCP_SERVER": {
             "command": "uvx",
-            "args": ["/home/nonead/MCP_Server/Nonead-Universal-Robots-MCP"]
+            "args": [
+                "https://www.nonead.com/download/nonead_universal_robots_mcp-0.1.0-py3-none-any.whl",
+                "nonead-universal-robots-mcp"
+            ]
          }
       }
     }
@@ -359,7 +378,10 @@ Windows:
       "mcpServers": {
         "nUR_MCP_SERVER": {
             "command": "uvx",
-            "args": ["D:\\MyProgram\\MCP_SERVER\\Nonead-Universal-Robots-MCP"]
+            "args": [
+                "https://www.nonead.com/download/nonead_universal_robots_mcp-0.1.0-py3-none-any.whl",
+                "nonead-universal-robots-mcp"
+            ]
          }
       }
     }
