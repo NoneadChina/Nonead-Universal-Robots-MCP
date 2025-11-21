@@ -7,6 +7,11 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import paramiko
 import URBasic
+from URBasic.advanced_multi_robot_coordinator import AdvancedMultiRobotCoordinator, CollaborationMode
+from URBasic.advanced_trajectory_planner import AdvancedTrajectoryPlanner
+from URBasic.advanced_data_recorder import AdvancedDataRecorder, RecordType
+from URBasic.advanced_data_analyzer import get_data_analyzer, AnalysisType, VisualizationType
+import numpy as np
 
 # Configure logging
 log_dir = Path("logs")
@@ -31,6 +36,40 @@ mcp = FastMCP(
 
 robot_list = None
 robotModle_list = None
+
+# 初始化新功能模块
+multi_robot_coordinator = None
+advanced_trajectory_planner = None
+advanced_data_recorder = None
+advanced_data_analyzer = None
+
+# 初始化扩展模块
+def initialize_extended_modules():
+    """初始化所有扩展模块"""
+    global multi_robot_coordinator, advanced_trajectory_planner
+    global advanced_data_recorder, advanced_data_analyzer
+    
+    try:
+        # 初始化多机器人协调器
+        multi_robot_coordinator = AdvancedMultiRobotCoordinator()
+        logger.info("高级多机器人协调器初始化成功")
+        
+        # 初始化高级轨迹规划器
+        advanced_trajectory_planner = AdvancedTrajectoryPlanner()
+        logger.info("高级轨迹规划器初始化成功")
+        
+        # 初始化高级数据记录器
+        advanced_data_recorder = AdvancedDataRecorder()
+        logger.info("高级数据记录器初始化成功")
+        
+        # 获取数据分析器实例（单例）
+        advanced_data_analyzer = get_data_analyzer()
+        logger.info("高级数据分析器初始化成功")
+        
+        return True
+    except Exception as e:
+        logger.error(f"初始化扩展模块失败: {str(e)}")
+        return False
 
 
 def set_robot_list():
@@ -651,6 +690,405 @@ def draw_circle(ip: str, center: dict, r: float, coordinate="z"):
         return return_msg(f"命令发送失败: {str(e)}")
 
 
+# 以下是新增的工具函数
+
+@mcp.tool()
+def setup_multi_robot_coordination(robot_ids: list, collaboration_mode: str = "parallel"):
+    """
+    设置多机器人协同工作环境
+    
+    参数:
+    - robot_ids: 参与协同的机器人ID列表
+    - collaboration_mode: 协作模式，可选值包括"sequential", "parallel", "synchronous", "hierarchical"
+    
+    返回:
+    - 成功或失败的消息
+    """
+    try:
+        if multi_robot_coordinator is None:
+            return return_msg("多机器人协调器未初始化")
+        
+        # 映射协作模式字符串到枚举值
+        mode_map = {
+            "sequential": CollaborationMode.SEQUENTIAL,
+            "parallel": CollaborationMode.PARALLEL,
+            "synchronous": CollaborationMode.SYNCHRONOUS,
+            "hierarchical": CollaborationMode.HIERARCHICAL
+        }
+        
+        if collaboration_mode not in mode_map:
+            return return_msg(f"不支持的协作模式: {collaboration_mode}")
+        
+        # 注册机器人到协调器
+        for robot_id in robot_ids:
+            # 检查机器人是否已连接
+            if robot_id in robot_list and robot_list[robot_id].robotConnector.RTDE.isRunning():
+                multi_robot_coordinator.register_robot(robot_id)
+                logger.info(f"机器人 {robot_id} 已注册到协调器")
+            else:
+                return return_msg(f"机器人 {robot_id} 未连接或不可用")
+        
+        # 设置协作模式
+        multi_robot_coordinator.set_collaboration_mode(mode_map[collaboration_mode])
+        
+        return return_msg(f"多机器人协同环境设置成功，协作模式: {collaboration_mode}")
+    except Exception as e:
+        logger.error(f"设置多机器人协同环境失败: {str(e)}")
+        return return_msg(f"设置多机器人协同环境失败: {str(e)}")
+
+
+@mcp.tool()
+def create_collaborative_task(task_name: str, robot_assignments: dict, dependencies: list = None):
+    """
+    创建多机器人协同任务
+    
+    参数:
+    - task_name: 任务名称
+    - robot_assignments: 机器人任务分配，格式为{"robot_id": {"operation": "...", "params": {...}}}
+    - dependencies: 任务依赖关系列表，格式为[{"from": "task1", "to": "task2"}]
+    
+    返回:
+    - 任务创建结果
+    """
+    try:
+        if multi_robot_coordinator is None:
+            return return_msg("多机器人协调器未初始化")
+        
+        # 创建任务
+        task_id = multi_robot_coordinator.create_collaboration_task(
+            task_name=task_name,
+            robot_assignments=robot_assignments,
+            dependencies=dependencies
+        )
+        
+        return return_msg(f"协同任务创建成功，任务ID: {task_id}")
+    except Exception as e:
+        logger.error(f"创建协同任务失败: {str(e)}")
+        return return_msg(f"创建协同任务失败: {str(e)}")
+
+
+@mcp.tool()
+def execute_collaborative_task(task_id: str):
+    """
+    执行多机器人协同任务
+    
+    参数:
+    - task_id: 任务ID
+    
+    返回:
+    - 执行结果
+    """
+    try:
+        if multi_robot_coordinator is None:
+            return return_msg("多机器人协调器未初始化")
+        
+        # 执行任务
+        result = multi_robot_coordinator.execute_task(task_id)
+        
+        return return_msg(f"协同任务执行结果: {result}")
+    except Exception as e:
+        logger.error(f"执行协同任务失败: {str(e)}")
+        return return_msg(f"执行协同任务失败: {str(e)}")
+
+
+@mcp.tool()
+def generate_bezier_path(control_points: list, num_points: int = 50):
+    """
+    生成贝塞尔曲线路径
+    
+    参数:
+    - control_points: 控制点列表，格式为[{"x": 0, "y": 0, "z": 0, "rx": 0, "ry": 0, "rz": 0}, ...]
+    - num_points: 生成的路径点数量
+    
+    返回:
+    - 路径点列表
+    """
+    try:
+        if advanced_trajectory_planner is None:
+            return return_msg("高级轨迹规划器未初始化")
+        
+        # 转换控制点格式
+        points = [
+            [p["x"], p["y"], p["z"], p["rx"], p["ry"], p["rz"]]
+            for p in control_points
+        ]
+        
+        # 生成贝塞尔曲线
+        path = advanced_trajectory_planner.generate_bezier_curve(
+            control_points=points,
+            num_points=num_points
+        )
+        
+        # 转换回字典格式
+        result_path = []
+        for point in path:
+            result_path.append({
+                "x": point[0],
+                "y": point[1],
+                "z": point[2],
+                "rx": point[3],
+                "ry": point[4],
+                "rz": point[5]
+            })
+        
+        return return_msg({"path": result_path})
+    except Exception as e:
+        logger.error(f"生成贝塞尔路径失败: {str(e)}")
+        return return_msg(f"生成贝塞尔路径失败: {str(e)}")
+
+
+@mcp.tool()
+def optimize_trajectory(ip: str, waypoints: list, optimization_type: str = "time"):
+    """
+    优化轨迹（时间、能耗或平滑度）
+    
+    参数:
+    - ip: 机器人IP地址
+    - waypoints: 路径点列表
+    - optimization_type: 优化类型，可选值包括"time", "energy", "smoothness"
+    
+    返回:
+    - 优化后的路径
+    """
+    try:
+        if '连接失败' in link_check(ip):
+            return return_msg(f"与机器人的连接已断开。")
+        
+        if advanced_trajectory_planner is None:
+            return return_msg("高级轨迹规划器未初始化")
+        
+        # 转换waypoints格式
+        points = [
+            [p["x"], p["y"], p["z"], p["rx"], p["ry"], p["rz"]]
+            for p in waypoints
+        ]
+        
+        # 获取机器人模型参数
+        robot_model = robotModle_list[ip]
+        
+        # 优化轨迹
+        optimized_path = advanced_trajectory_planner.optimize_trajectory(
+            waypoints=points,
+            optimization_type=optimization_type,
+            robot_model=robot_model
+        )
+        
+        # 转换回字典格式
+        result_path = []
+        for point in optimized_path:
+            result_path.append({
+                "x": point[0],
+                "y": point[1],
+                "z": point[2],
+                "rx": point[3],
+                "ry": point[4],
+                "rz": point[5]
+            })
+        
+        return return_msg({"optimized_path": result_path})
+    except Exception as e:
+        logger.error(f"优化轨迹失败: {str(e)}")
+        return return_msg(f"优化轨迹失败: {str(e)}")
+
+
+@mcp.tool()
+def start_data_recording(robot_id: str, record_types: list, duration: float = 0):
+    """
+    开始记录机器人数据
+    
+    参数:
+    - robot_id: 机器人ID
+    - record_types: 记录类型列表，可选值包括"robot_state", "joint_data", "tcp_data", "error_data"
+    - duration: 记录持续时间（秒），0表示持续记录直到停止
+    
+    返回:
+    - 记录会话ID
+    """
+    try:
+        if advanced_data_recorder is None:
+            return return_msg("高级数据记录器未初始化")
+        
+        # 映射记录类型字符串到枚举值
+        type_map = {
+            "robot_state": RecordType.ROBOT_STATE,
+            "joint_data": RecordType.JOINT_DATA,
+            "tcp_data": RecordType.TCP_DATA,
+            "error_data": RecordType.ERROR_DATA
+        }
+        
+        record_enum_types = []
+        for record_type in record_types:
+            if record_type in type_map:
+                record_enum_types.append(type_map[record_type])
+            else:
+                return return_msg(f"不支持的记录类型: {record_type}")
+        
+        # 启动记录
+        session_id = advanced_data_recorder.start_recording(
+            robot_id=robot_id,
+            record_types=record_enum_types,
+            duration=duration
+        )
+        
+        return return_msg({"session_id": session_id, "message": "数据记录已启动"})
+    except Exception as e:
+        logger.error(f"开始数据记录失败: {str(e)}")
+        return return_msg(f"开始数据记录失败: {str(e)}")
+
+
+@mcp.tool()
+def stop_data_recording(session_id: str):
+    """
+    停止数据记录
+    
+    参数:
+    - session_id: 记录会话ID
+    
+    返回:
+    - 停止状态
+    """
+    try:
+        if advanced_data_recorder is None:
+            return return_msg("高级数据记录器未初始化")
+        
+        # 停止记录
+        success = advanced_data_recorder.stop_recording(session_id)
+        
+        if success:
+            return return_msg({"success": True, "message": "数据记录已停止"})
+        else:
+            return return_msg({"success": False, "message": "停止数据记录失败，会话不存在"})
+    except Exception as e:
+        logger.error(f"停止数据记录失败: {str(e)}")
+        return return_msg(f"停止数据记录失败: {str(e)}")
+
+
+@mcp.tool()
+def analyze_robot_data(robot_id: str, analysis_type: str, start_time: float = None, end_time: float = None):
+    """
+    分析机器人数据
+    
+    参数:
+    - robot_id: 机器人ID
+    - analysis_type: 分析类型，可选值包括"statistical", "trend", "anomaly", "performance"
+    - start_time: 开始时间戳
+    - end_time: 结束时间戳
+    
+    返回:
+    - 分析结果
+    """
+    try:
+        if advanced_data_analyzer is None:
+            return return_msg("高级数据分析器未初始化")
+        
+        # 映射分析类型字符串到枚举值
+        type_map = {
+            "statistical": AnalysisType.STATISTICAL,
+            "trend": AnalysisType.TREND,
+            "anomaly": AnalysisType.ANOMALY,
+            "performance": AnalysisType.PERFORMANCE
+        }
+        
+        if analysis_type not in type_map:
+            return return_msg(f"不支持的分析类型: {analysis_type}")
+        
+        # 加载数据
+        df = advanced_data_analyzer.load_data(
+            robot_id=robot_id,
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        if df.empty:
+            return return_msg({"error": "未找到数据"})
+        
+        # 执行分析
+        analysis_params = {}
+        if analysis_type == "trend" and 'timestamp' in df.columns:
+            # 对于趋势分析，使用时间戳作为x轴
+            numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+            if numeric_columns and numeric_columns[0] != 'timestamp':
+                analysis_params = {'x_column': 'timestamp', 'y_column': numeric_columns[0]}
+        
+        result = advanced_data_analyzer.analyze(
+            df,
+            type_map[analysis_type],
+            analysis_params
+        )
+        
+        return return_msg({"analysis_type": analysis_type, "result": result})
+    except Exception as e:
+        logger.error(f"分析机器人数据失败: {str(e)}")
+        return return_msg(f"分析机器人数据失败: {str(e)}")
+
+
+@mcp.tool()
+def generate_robot_report(robot_id: str, start_time: float = None, end_time: float = None, report_path: str = None):
+    """
+    生成机器人运行报告
+    
+    参数:
+    - robot_id: 机器人ID
+    - start_time: 开始时间戳
+    - end_time: 结束时间戳
+    - report_path: 报告保存路径
+    
+    返回:
+    - 报告生成结果
+    """
+    try:
+        if advanced_data_analyzer is None:
+            return return_msg("高级数据分析器未初始化")
+        
+        # 生成报告
+        report = advanced_data_analyzer.generate_report(
+            robot_id=robot_id,
+            start_time=start_time,
+            end_time=end_time,
+            report_path=report_path
+        )
+        
+        if 'error' in report:
+            return return_msg({"error": report['error']})
+        
+        return return_msg({"success": True, "report": report})
+    except Exception as e:
+        logger.error(f"生成机器人报告失败: {str(e)}")
+        return return_msg(f"生成机器人报告失败: {str(e)}")
+
+
+@mcp.tool()
+def compare_robots_performance(robot_ids: list, metric_columns: list, start_time: float = None, end_time: float = None):
+    """
+    比较多个机器人的性能
+    
+    参数:
+    - robot_ids: 机器人ID列表
+    - metric_columns: 比较指标列
+    - start_time: 开始时间戳
+    - end_time: 结束时间戳
+    
+    返回:
+    - 比较结果
+    """
+    try:
+        if advanced_data_analyzer is None:
+            return return_msg("高级数据分析器未初始化")
+        
+        # 执行比较
+        comparison = advanced_data_analyzer.compare_robots(
+            robot_ids=robot_ids,
+            metric_columns=metric_columns,
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        return return_msg({"comparison": comparison})
+    except Exception as e:
+        logger.error(f"比较机器人性能失败: {str(e)}")
+        return return_msg(f"比较机器人性能失败: {str(e)}")
+
+
 @mcp.tool()
 def draw_square(ip: str, origin: dict, border: float, coordinate="z"):
     """给定起点位置和边长，在水平或竖直方向画一个正方形
@@ -736,6 +1174,12 @@ def main():
     """Run the MCP server"""
     logger.info("Nonead-Universal-Robots-MCP  启动")
     set_robot_list()
+    
+    # 初始化扩展模块
+    logger.info("初始化扩展功能模块...")
+    initialize_extended_modules()
+    
+    logger.info("MCP服务器启动中...")
     mcp.run()
 
 
